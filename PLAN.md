@@ -42,10 +42,12 @@ is the discovery design described below.
 - Added `pyproject.toml`, `uv.lock`, `.venv`, and `.gitignore`. The ignore rules
   preserve seed CSVs while excluding other data-directory contents, caches,
   virtual environments, and environment secrets.
-- An existing, untracked `hypertext_search/discovery.py` was found during setup
-  on October 12, 2026. It has not been reviewed or verified and is preserved
-  locally outside the setup commit. No public-site discovery run was performed.
-- `DISCOVERY_DESIGN.md` records a proposal awaiting review gate 1 approval.
+- The existing discovery module was reviewed and completed after the user
+  approved the discovery design on October 12, 2026. CLI, safeguards, SQLite
+  queues, provenance, and report exports are implemented.
+- Offline verification: 25 tests passed; see `OFFLINE_VERIFICATION.md`.
+  No public-site discovery run was performed. Review gate 2 awaits approval
+  and an operator contact for the user agent.
 - Git is initialized on `main`. The initial setup commit is `cd10ac7`.
 - Public repository: https://github.com/annihalated/hypertext-search.
   `origin` is connected and `main` has been pushed successfully.
@@ -55,7 +57,8 @@ is the discovery design described below.
 Setup was completed after inspecting the workspace and authenticated GitHub
 account. The seed CSVs were preserved byte-for-byte. Their existing CRLF line
 endings produce Git whitespace-check notices; they were not rewritten.
-Next: review and approve the discovery design before implementing the slice.
+Discovery design approval has been received and implementation is complete.
+Next: review offline results and approve the collection-wide discovery run.
 
 ## First slice: discover URLs across all 141 seeds
 

@@ -3,3 +3,12 @@ name = "hypertext-search"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = []
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]

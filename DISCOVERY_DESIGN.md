@@ -1,7 +1,8 @@
-# Discovery design — proposed for review
+# Discovery design
 
-Status: awaiting approval under PLAN.md review gate 1. No crawler or public-site
-run is implemented or authorized by this proposal.
+Status: approved under PLAN.md review gate 1 on October 12, 2026. Implementation
+and offline verification are complete. The public-site run still awaits gate 2
+approval; see OFFLINE_VERIFICATION.md.
 
 ## Scope and URL identity
 
@@ -63,10 +64,11 @@ documents. Exhausted routes do not prove complete historical coverage.
 
 ## Dependencies and persistence
 
-Propose `httpx` for bounded HTTP requests and `beautifulsoup4` for HTML navigation.
-Use Python standard-library XML parsing, robots parsing, gzip, CSV, and SQLite;
-disable XML entity declarations and cap decompressed input. Add `pytest` for
-offline fixture verification only. Lock dependencies with uv when implemented.
+Implementation retains the existing standard-library HTTP transport with public
+DNS address pinning and HTMLParser navigation, instead of the proposed httpx and
+BeautifulSoup dependencies. Use standard-library XML parsing, robots parsing,
+gzip, CSV, and SQLite; reject XML entity declarations and cap decompressed input.
+pytest is locked with uv for offline fixture verification only.
 
 Use `data/discovery.sqlite3` with tables for runs, seeds, resource observations,
 queue jobs, fetch attempts, candidate URLs, provenance edges, and warnings.
