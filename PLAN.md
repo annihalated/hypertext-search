@@ -42,22 +42,20 @@ is the discovery design described below.
 - Added `pyproject.toml`, `uv.lock`, `.venv`, and `.gitignore`. The ignore rules
   preserve seed CSVs while excluding other data-directory contents, caches,
   virtual environments, and environment secrets.
-- No crawler, extraction, search, website, or tests have been implemented.
-- Git initialization and GitHub creation previously failed because the session
-  denied `.git` writes and could not reach GitHub. The user subsequently completed
-  `gh auth` and enabled full access. Those changes have not yet been retried under
-  the newly supplied unrestricted permissions.
-- The public repository has not been confirmed created. No initial commit or
-  push has been confirmed performed.
+- An existing, untracked `hypertext_search/discovery.py` was found during setup
+  on October 12, 2026. It has not been reviewed or verified and is preserved
+  locally outside the setup commit. No public-site discovery run was performed.
+- `DISCOVERY_DESIGN.md` records a proposal awaiting review gate 1 approval.
+- Git is initialized on `main`. The initial setup commit is `cd10ac7`.
+- Public repository: https://github.com/annihalated/hypertext-search.
+  `origin` is connected and `main` has been pushed successfully.
 
-### Finish setup after restarting
+### Setup completed
 
-Inspect current state before acting; do not overwrite existing repositories or
-remotes. Check GitHub authentication and whether `hypertext-search` already
-exists under the authenticated account. Initialize Git with branch `main` if
-needed, review the files being staged, make the initial setup commit, create the
-public repository if absent, connect `origin`, and push. The user has explicitly
-authorized these actions; do not request permission again.
+Setup was completed after inspecting the workspace and authenticated GitHub
+account. The seed CSVs were preserved byte-for-byte. Their existing CRLF line
+endings produce Git whitespace-check notices; they were not rewritten.
+Next: review and approve the discovery design before implementing the slice.
 
 ## First slice: discover URLs across all 141 seeds
 
