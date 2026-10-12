@@ -1,94 +1,80 @@
-# Discovery design
+# Discovery design — Scrapy migration
 
-Status: approved under PLAN.md review gate 1 on October 12, 2026. Implementation
-and offline verification are complete. The public-site run still awaits gate 2
-approval; see OFFLINE_VERIFICATION.md.
+The user approved replacing the custom crawler with Scrapy's recommended project
+structure. Follow-up choices: 50 concurrent requests globally, 0.1-second spacing
+per host, robots as opt-out, repository URL as contact, Scrapy INFO
+logging, and a fresh run after deleting the old custom database. Subsequent approval
+expanded this slice to public text collection, RSS first, with strict site
+boundaries and shared Substack throttling. The user runs real
+crawls; implementation and verification do not launch public-site crawls.
 
-## Scope and URL identity
+## Scrapy responsibilities
 
-- Use every row in `data/sites.csv` as a separate publication scope, preserving
-  its IDs and references to both source collections.
-- Accept HTTP(S) URLs on the seed hostname within its path scope. Match path
-  boundaries: `/money-stuff` and its descendants qualify; `/money-stuffing`
-  does not. Reject credentials, malformed URLs, and non-web schemes.
-- Remove fragments, lowercase hostnames, remove default ports, resolve relative
-  URLs, and remove recognized tracking parameters. Preserve meaningful query
-  parameters, trailing slashes, and path case. Do not merge URLs using canonical
-  tags alone; record canonical hints as evidence.
-- Treat HTTP-to-HTTPS upgrades on the same host as aliases. Record other host
-  redirects for review; do not silently widen the publication scope. A `www`
-  alias requires observed redirects and compatible robots rules. Keep the path
-  restriction across redirects.
-- Permit external feed/sitemap fetches only when explicitly advertised by an
-  allowed page, robots file, or sitemap. Such resources never widen candidate
-  scope. Restrict all requests and redirects to public network addresses.
+- Standard `scrapy.cfg`, settings, spiders, middleware, extension, and pipeline.
+- One spider for the collection, so global concurrency is actually global.
+- Native HTTP downloader, TLS verification, robots middleware and Protego parser.
+- Native scheduler, downloader-aware priority queue, duplicate filter, retry and
+  redirect middleware, compression limits, and INFO logging.
+- JOBDIR owns disk queues and spider state. Native SQLite-backed queue classes
+  improve queue durability. Clean Ctrl-C shutdown and the same command resume
+  the job. Each new run needs a distinct JOBDIR.
+- Native feed exporters are available with `-o` or `-O`.
 
-## Discovery strategy
+## Project responsibilities
 
-1. Read robots rules, the scoped homepage, advertised feeds and sitemaps, and
-   conventional feed/sitemap endpoints. Root robots and sitemap resources may
-   sit outside a path scope, but their page candidates remain scope-filtered.
-2. Recursively process sitemap indexes and URL sets, including compressed
-   sitemaps. Parse RSS and Atom entries and explicit continuation links.
-3. Collect in-scope HTML-looking links from fetched discovery documents. Persist
-   standalone pages and listings as candidates along with posts and notes.
-4. Enqueue explicit archive, category, tag, date-index, and pagination routes.
-   Follow pagination to exhaustion. Record ambiguous routes and client-rendered
-   navigation as gaps rather than fetching all candidate bodies.
-5. Preserve every observation: seed, candidate URL, source document, discovery
-   method, timestamp, link text, and any published date or sitemap last-modified
-   value. Dates are evidence supplied by the source, not verified publication
-   dates.
+Read all 141 seed scopes from CSV. Snapshot seeds and effective crawl settings
+for a run; refuse a resume with changed settings. Each callback carries its seed
+and discovery kind using serializable request metadata/callback arguments.
 
-Candidate counts describe discovered URLs, not verified HTML pages or searchable
-documents. Exhausted routes do not prove complete historical coverage.
+Normalize HTTP(S) URLs, remove fragments and tracking parameters, and enforce
+hostname plus path boundaries. Record observed www aliases without allowing an
+unrelated HTML host redirect or path escape. External feeds, sitemap index entries, and redirects are rejected before
+fetching. Conventional root robots and sitemap endpoints are permitted for path-
+scoped publications; other resource routes obey the same publication path bounds. Reject credentials and non-public addresses through downloader middleware
+and Scrapy's DNS resolver extension point.
 
-## Safeguards
+Discover homepages, advertised and conventional feeds/sitemaps, recursive sitemap
+indexes, archives, pagination, and standalone links. Use Scrapy selectors and
+its Sitemap parser. Feed content is saved directly when available. Full-content fields skip the
+post page; excerpts and uncertain descriptions fall back to public page text.
+Traverse in-scope HTML links for historical and standalone pages. Preserve
+candidate provenance, source dates, and text observations, including earlier
+versions. Text completeness is inferred, not verified; paywall markers retain
+partial public content. Detect calendar/query expansion,
+duplicate scheduled targets, and repeated document hashes; record uncertain
+navigation and adapter needs as gaps.
 
-- Identifiable user agent naming Hypertext Search, with an operator contact
-  configured before a real run. Honor robots rules for every fetched resource;
-  record disallowed and unavailable robots outcomes. A robots retrieval failure
-  pauses that host; a 404 means no published rules.
-- Four global requests at a time; at least one second between request starts
-  on each host, with no overlapping requests per host. Honor longer published
-  crawl delays and Retry-After responses.
-- Proposed limits: 10-second connection timeout, 30-second total request timeout,
-  five redirects, two retries for transient failures with backoff, and 10 MiB
-  maximum decompressed response size. Record every limit reached.
-- Deduplicate scheduled URLs and detect repeated pagination targets, repeated
-  document hashes, calendar expansion, and multiplying query combinations.
-  Quarantine suspected traps with their evidence for review. No small per-site
-  request cap; an operator interruption leaves durable unfinished work.
-- Parse XML without external entities. Exclude obvious downloads by URL suffix;
-  classify uncertain candidates as unverified. Isolate failures per seed.
+ROBOTSTXT_OBEY stays enabled. Explicit restrictions are obeyed; inaccessible
+robots files no longer block the host. Scrapy's native robots behavior controls
+that fallback. Apply published crawl delays to native downloader slots and
+Retry-After pauses before native retries. Keep one simultaneous request per host. All Substack subdomains (including
+native robots requests) share the native `substack` download slot, with one
+simultaneous request and a one-second delay. Custom domains join after headers
+identify them as Substack. Other hosts retain 0.1-second spacing and 50 global
+requests. Full RSS text and page text are stored through the item pipeline.
+The fresh job defaults to `data/crawls/text-1`; format-version checks reject old
+discovery queues.
 
-## Dependencies and persistence
+## Outputs
 
-Implementation retains the existing standard-library HTTP transport with public
-DNS address pinning and HTMLParser navigation, instead of the proposed httpx and
-BeautifulSoup dependencies. Use standard-library XML parsing, robots parsing,
-gzip, CSV, and SQLite; reject XML entity declarations and cap decompressed input.
-pytest is locked with uv for offline fixture verification only.
+An item pipeline and signal extension write observations, request outcomes,
+response hashes and bodies, and failures to the job directory. SQLite holds
+results only; there is no parallel custom queue. Reports are a local-only command
+and export every seed's counts, outcomes, routes, samples, date evidence,
+provenance, unfinished observed requests, and warnings.
 
-Use `data/discovery.sqlite3` with tables for runs, seeds, resource observations,
-queue jobs, fetch attempts, candidate URLs, provenance edges, and warnings.
-Queue states are pending, leased, done, blocked, or failed. Commit observations
-and derived jobs atomically; expire abandoned leases on resume. Retain retries,
-redirect chains, response hashes, robots decisions, and discovery documents so
-results remain inspectable. A resume uses the original seed/config snapshot;
-configuration changes require an explicit new run.
+Candidate counts are not verified searchable pages. Types and suspected gaps are
+inference. Queue exhaustion is not proof of complete historical coverage.
 
-## Outputs and verification gates
+## Verification
 
-Export a Markdown assessment plus per-seed CSV, candidate CSV, provenance CSV,
-and structured warnings. Include every seed's outcome and resolved address,
-routes, candidate and request counts, failures, unfinished queues, alias/trap
-evidence, date ranges with sources, and representative URLs. Label page types
-and suspected coverage gaps as inference.
+Offline tests use a synthetic download handler with Scrapy's real engine,
+robots/retry/redirect middleware, scheduler, pipeline, and state persistence.
+They do not contact public sites. See OFFLINE_VERIFICATION.md for results.
 
-Before any public-site run, fixtures must exercise recursive/gzipped sitemaps,
-feeds, archive pagination, path and redirect boundaries, URL deduplication,
-robots decisions, retry limits, oversized responses, loop/trap detection, site
-failure isolation, and interruption/resume. Tests use fake HTTP responses and a
-fake clock, never public sites. Present results for review gate 2 and obtain
-approval for the collection-wide run. Stop for assessment after that run.
+Official references: [tutorial](https://docs.scrapy.org/en/latest/intro/tutorial.html),
+[JOBDIR](https://docs.scrapy.org/en/latest/topics/jobs.html),
+[robots middleware](https://docs.scrapy.org/en/latest/topics/downloader-middleware.html#robotstxtmiddleware),
+[item pipelines](https://docs.scrapy.org/en/latest/topics/item-pipeline.html),
+[extensions](https://docs.scrapy.org/en/latest/topics/extensions.html), and
+[request fingerprints](https://docs.scrapy.org/en/latest/topics/request-response.html#request-fingerprints).

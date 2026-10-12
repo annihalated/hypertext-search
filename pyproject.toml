@@ -2,7 +2,9 @@
 name = "hypertext-search"
 version = "0.1.0"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "scrapy>=2.19.0",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

@@ -1,36 +1,43 @@
-# Discovery slice: offline review
+# Scrapy text collection: offline verification
 
-Status: implementation complete; awaiting approval for a public-site run under
-PLAN.md review gate 2. No public sites have been crawled.
+October 12, 2026: `uv run pytest -q` — **22 passed**.
+`uv run scrapy list` discovers the `discovery` spider.
 
-Validation: `uv run pytest -q` — **25 passed** on October 12, 2026.
-`uv run python -m hypertext_search --help` exposes start, resume, and report.
-The test suite blocks DNS resolution and socket connections, except a mocked
-DNS result for the public-address guard and a synthetic DNS timeout.
+The former custom-engine tests were replaced with tests for the new Scrapy
+implementation. Integration tests run the real Scrapy engine with an in-memory
+fixture download handler, while disabling real DNS/connection helpers. No public
+sites were crawled by the agent.
 
-| Fixture | Observed result |
-| --- | --- |
-| Seed collection | All 141 seed scopes load successfully. |
-| Recursive and gzipped sitemaps | Nested URL sets discovered; out-of-scope URLs excluded; last-modified evidence retained. |
-| Atom and RSS | Candidate links and source dates retained; explicit next-feed links followed, including advertised external resources. |
-| Archives and pagination | Explicit archive pages followed; ordinary posts and standalone pages remain candidates without body fetches. |
-| Normalization and deduplication | Tracking/fragments removed, path boundary and traversal checks enforced, distinct provenance retained for shared candidates. |
-| Robots and isolation | Disallowed routes never fetched; unavailable robots block that host while other seeds finish. Shared-host sitemaps apply to every scope. |
-| Redirects | Observed www alias recorded after rules checks; path escape, unrelated probe redirect, and redirect loops blocked. Robots www redirect handled. |
-| Pacing and concurrency | No overlapping requests per host, at most four global requests, three-second published delay and seven-second Retry-After honored. |
-| Retries and limits | Three attempts at most for a persistent transient status; oversized bodies, compressed bombs, and XML declarations rejected. |
-| Traps and loops | Calendar links, duplicate query keys, repeated pagination targets, and repeated bodies produce warnings and stop expansion. |
-| Persistence | Reopened database resumes pending and abandoned leased jobs using its original snapshot; completed jobs are not fetched again. |
-| Interrupted work and transactions | Cancellation leaves a recoverable lease; partial observations and new jobs roll back together. |
-| Failure evidence | Parsing failures retain response bodies; non-HTML responses do not become fetched HTML candidates. |
-| Reports | Per-seed request counts match attempts; candidate/provenance CSVs and warnings exported; assessment explicitly labels unverified URLs and inferred types. |
+Verified:
 
-Implementation uses the existing standard-library transport and parsers rather
-than the proposed httpx/BeautifulSoup dependencies. Public DNS address pinning,
-bounded decompression, and disabled automatic redirects remain explicit.
-pytest is the only added dependency, in the development group.
+- All 141 seed scopes load; path boundaries and URL normalization are enforced.
+- Defaults are 50 global requests, one per host, 0.1-second spacing, robots enabled.
+- Shared-host requests get separate scope-aware fingerprints; callbacks survive
+  native request serialization, and resume preserves its seed/settings snapshot.
+- Sitemap indexes, gzipped URL sets, advertised robots sitemaps, Atom feeds,
+  feed continuation, archives, and pagination discover candidates and source dates.
+- Page bodies are collected for excerpts, old posts and standalone pages.
+  Full RSS entries save text without a redundant post-page request.
+- External feed links, sitemap indexes, robots sitemaps, and redirects never
+  fetch unrelated sites. This includes a platform-wide Substack sitemap fixture.
+- Both Substack subdomains and native robots requests use the same Scrapy slot.
+- RSS content:encoded is saved as text; scripts and navigation are excluded.
+  RSS excerpt observations are preserved after the fuller page text replaces
+  them in the current documents table.
+- Native robots middleware blocks forbidden archive requests; unavailable robots
+  proceeds and is recorded; native retry succeeds after a synthetic HTTP 503.
+- Redirect path escapes are stopped; observed www aliases are retained.
+- Native duplicate filtering suppresses loops and retains candidate provenance.
+- A real JOBDIR run pauses with pending disk-queued requests, resumes through the
+  native scheduler, and visits all 80 archive routes without repeat downloads.
+- Repeated document bodies, query traps, XML entity declarations, and compressed
+  size limits produce warnings without expanding the affected routes.
+- Private/literal network addresses are rejected.
+- Local reports export candidates, provenance, documents, attempts, requests and warnings.
 
-Before the real run, supply an operator email or contact URL for the user agent.
-This review establishes fixture behavior, not live-site compatibility or
-complete discovery. The collection-wide report will identify blocked routes,
-ambiguous archives, redirects needing review, and adapter candidates.
+Scrapy INFO logging by default is used without a custom logging handler. Real
+crawls are left to the user. Start a fresh `text-1` job after the scope/text update; the old
+custom crawler database was removed at the user's explicit request.
+
+These tests establish fixture behavior, not live-site coverage. The next review
+uses the report produced by the user's collection-wide crawl.

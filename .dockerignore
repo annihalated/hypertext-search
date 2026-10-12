@@ -1,0 +1,11 @@
+*
+!Dockerfile
+!pyproject.toml
+!uv.lock
+!hypertext_search/
+!hypertext_search/**
+!data/
+!data/sites.csv
+!.deploy/
+!.deploy/search.sqlite3
+**/__pycache__
