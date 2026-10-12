@@ -181,5 +181,5 @@ fly deploy --ha=false
 ```
 
 The snapshot is built with SQLite backup for a consistent database. Deployments
-replace it with the current local results. The single 512 MB Fly Machine stops
-when idle and starts on requests; its first request after stopping may take longer.
+replace it with the current local results. The single 512 MB Fly Machine in Singapore stays running, with automatic
+stopping disabled.
